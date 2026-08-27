@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Earnova</title>
+
   <style>
     body {
       margin: 0;
@@ -83,6 +84,16 @@
       color: #6b7280;
       line-height: 1.5;
     }
+
+    .success {
+      color: #15803d;
+      font-weight: 700;
+    }
+
+    .error {
+      color: #dc2626;
+      font-weight: 700;
+    }
   </style>
 </head>
 
@@ -98,20 +109,24 @@
 
     <div class="card">
 
-      <h2>Membership Access</h2>
+      <h2 id="title">Membership Access</h2>
 
       <div class="price">₦5,000</div>
 
-      <input
-        type="email"
-        id="email"
-        placeholder="Enter your email address"
-        required
-      >
+      <div id="paymentForm">
 
-      <button id="payButton">
-        Join Earnova — ₦5,000
-      </button>
+        <input
+          type="email"
+          id="email"
+          placeholder="Enter your email address"
+          required
+        >
+
+        <button id="payButton">
+          Join Earnova — ₦5,000
+        </button>
+
+      </div>
 
       <div id="message"></div>
 
@@ -125,33 +140,97 @@
   </div>
 
   <script>
-    const SUPABASE_FUNCTION_URL =
+
+    const INITIALIZE_FUNCTION =
       "https://rrrbqmnmtwmhukistuzv.supabase.co/functions/v1/initialize-payment";
+
+    const VERIFY_FUNCTION =
+      "https://rrrbqmnmtwmhukistuzv.supabase.co/functions/v1/verify-payment";
 
     const emailInput = document.getElementById("email");
     const payButton = document.getElementById("payButton");
     const message = document.getElementById("message");
+    const paymentForm = document.getElementById("paymentForm");
+    const title = document.getElementById("title");
+
+    /*
+      Check whether Paystack has returned the customer
+      to Earnova with a transaction reference.
+    */
+
+    async function verifyReturnedPayment() {
+
+      const params = new URLSearchParams(window.location.search);
+      const reference = params.get("reference");
+
+      if (!reference) {
+        return;
+      }
+
+      paymentForm.style.display = "none";
+      title.textContent = "Verifying Payment...";
+      message.textContent = "Please wait while we confirm your payment.";
+
+      try {
+
+        const response = await fetch(VERIFY_FUNCTION, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            reference: reference
+          })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.paid) {
+          throw new Error(
+            data.error || "Payment could not be verified."
+          );
+        }
+
+        title.textContent = "Payment Successful!";
+        message.className = "success";
+        message.textContent =
+          "Your ₦5,000 payment has been successfully verified.";
+
+      } catch (error) {
+
+        title.textContent = "Payment Verification Failed";
+        message.className = "error";
+        message.textContent =
+          error.message || "We could not verify your payment.";
+
+      }
+
+    }
 
     payButton.addEventListener("click", async () => {
 
       const email = emailInput.value.trim();
 
       if (!email || !email.includes("@")) {
+        message.className = "error";
         message.textContent = "Please enter a valid email address.";
         return;
       }
 
       payButton.disabled = true;
       payButton.textContent = "Connecting to Paystack...";
+      message.className = "";
       message.textContent = "";
 
       try {
 
-        const response = await fetch(SUPABASE_FUNCTION_URL, {
+        const response = await fetch(INITIALIZE_FUNCTION, {
           method: "POST",
+
           headers: {
             "Content-Type": "application/json"
           },
+
           body: JSON.stringify({
             email: email
           })
@@ -169,14 +248,19 @@
 
       } catch (error) {
 
+        message.className = "error";
         message.textContent =
           error.message || "Something went wrong. Please try again.";
 
         payButton.disabled = false;
         payButton.textContent = "Join Earnova — ₦5,000";
       }
+
     });
+
+    verifyReturnedPayment();
+
   </script>
 
 </body>
-  </html>
+        </html>
